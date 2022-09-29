@@ -67,6 +67,7 @@ class block_manager {
 #define NINDIRECT (BLOCK_SIZE / sizeof(uint))
 #define MAXFILE (NDIRECT + NINDIRECT)
 
+#define FILESTART IBLOCK(INODE_NUM, BLOCK_NUM) + 1
 typedef struct inode {
   short type;
   unsigned int size;
@@ -90,6 +91,10 @@ class inode_manager {
   void write_file(uint32_t inum, const char *buf, int size);
   void remove_file(uint32_t inum);
   void get_attr(uint32_t inum, extent_protocol::attr &a);
+
+  void alloc_inode_block(struct inode* cur, blockid_t start, blockid_t num);
+  void free_inode_block(struct inode*, blockid_t start, blockid_t num);
+  blockid_t get_nth_block(struct inode* , blockid_t);
 };
 
 #endif
