@@ -65,6 +65,8 @@ block_manager::free_block(uint32_t id)
 block_manager::block_manager()
 {
   d = new disk();
+  for (uint i = 0; i < IBLOCK(INODE_NUM, sb.nblocks); i++)
+  using_blocks[i] = 1;
 
   // format the disk
   sb.size = BLOCK_SIZE * BLOCK_NUM;
@@ -111,7 +113,7 @@ inode_manager::alloc_inode(uint32_t type)
     struct inode* tmp = get_inode(i);
     
     if (tmp == nullptr) {
-      tmp = new inode();
+      tmp = (inode_t *)malloc(sizeof(inode_t));
       tmp->type = type;
       tmp->atime = tmp->ctime = tmp->mtime = time(NULL);
   
@@ -141,10 +143,7 @@ inode_manager::free_inode(uint32_t inum)
   assert(cur->type !=0);
   cur->type = 0;
   this->put_inode(inum, cur);
-  
   free(cur);
-
-  return;
 }
 
 
@@ -157,7 +156,7 @@ inode_manager::get_inode(uint32_t inum)
   /* 
    * your code goes here.
    */
-  char buf[BLOCK_NUM];
+  char buf[BLOCK_SIZE];
   bm->read_block(IBLOCK(inum, bm->sb.nblocks), buf);
   struct inode* rt = (struct inode*)buf + inum%IPB;
   if (rt->type == 0) {
@@ -248,30 +247,11 @@ void inode_manager::free_inode_block(struct inode* cur, blockid_t start, blockid
   assert(start + num <= MAXFILE);
   char buf[BLOCK_SIZE];
 
-  if (start + num >= NDIRECT) {
-    bm->read_block(cur->blocks[NDIRECT], buf);
-    if (start >= NDIRECT) {
-      for (blockid_t i = start - NDIRECT; i < start + num - NDIRECT; ++i) {
-        bm->free_block(((blockid_t *)buf)[i]);
-      }
-      if (start == NDIRECT)
-        bm->free_block(cur->blocks[NDIRECT]);
-
-    }else {
-      for (blockid_t i = 0; i < start + num - NDIRECT; ++i) {
-        bm->free_block(((blockid_t *)buf)[i]);
-      }
-
-      for (blockid_t i = start; i <= NDIRECT; ++i) {
-        bm->free_block(cur->blocks[i]);
-      }
-
-    }
-  }else {
-    for (blockid_t i = start; i < start + num; ++i) {
-        bm->free_block(cur->blocks[i]);
-      }
+  for (int i = start; i < start + num; ++i) {
+    bm->free_block(get_nth_block(cur, i));
   }
+  // if (start <= NDIRECT && start+num >= NDIRECT)
+  //  bm->free_block(cur->blocks[NDIRECT]);
 
 }
 
@@ -369,8 +349,8 @@ inode_manager::remove_file(uint32_t inum)
   for (uint i = 0; i < block_num; ++i) {
     bm->free_block(get_nth_block(cur, i));
   }
-  if (block_num >= NDIRECT)
-    bm->free_block(NDIRECT);
+  // if (block_num >= NDIRECT)
+  //   bm->free_block(NDIRECT);
     
   free(cur);
   free_inode(inum);
