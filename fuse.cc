@@ -1,10 +1,3 @@
-/*
- * receive request from fuse and call methods of chfs_client
- *
- * started life as low-level example in the fuse distribution.  we
- * have to use low-level interface in order to get i-numbers.  the
- * high-level interface only gives us complete paths.
- */
 
 #include <fuse_lowlevel.h>
 #include <stdio.h>
@@ -30,7 +23,7 @@ int id() {
 // including owner, permissions, size, &c. The information is
 // much the same as that returned by the stat() system call.
 // The kernel needs attributes in many situations, and some
-// fuse functions (such as lookup) need to return attributes
+// fuse functions (such as lookup) need to return ttributes
 // as well as other information, so getattr() gets called a lot.
 //
 // ChFS fakes most of the attributes. It does provide more or
@@ -58,7 +51,7 @@ getattr(chfs_client::inum inum, struct stat &st)
         st.st_ctime = info.ctime;
         st.st_size = info.size;
         printf("   getattr -> %llu\n", info.size);
-    } else {
+    } else if (chfs->isdir(inum)) {
         chfs_client::dirinfo info;
         ret = chfs->getdir(inum, info);
         if(ret != chfs_client::OK)
@@ -69,6 +62,19 @@ getattr(chfs_client::inum inum, struct stat &st)
         st.st_mtime = info.mtime;
         st.st_ctime = info.ctime;
         printf("   getattr -> %lu %lu %lu\n", info.atime, info.mtime, info.ctime);
+    } else {
+        // need to add this after adding the symbolic link
+        chfs_client::fileinfo info;
+        ret = chfs->getfile(inum, info);
+        if(ret != chfs_client::OK)
+            return ret;
+        st.st_mode = S_IFLNK | 0777;
+        st.st_nlink = 1;
+        st.st_atime = info.atime;
+        st.st_mtime = info.mtime;
+        st.st_ctime = info.ctime;
+        st.st_size = info.size;
+        printf("   getattr -> link %llu\n", info.size);
     }
     return chfs_client::OK;
 }
@@ -124,9 +130,15 @@ fuseserver_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
     printf("fuseserver_setattr 0x%x\n", to_set);
     if (FUSE_SET_ATTR_SIZE & to_set) {
         printf("   fuseserver_setattr set size to %zu\n", attr->st_size);
-
-#if 0
     struct stat st;
+#if 1
+        // Change the above line to "#if 1", and your code goes here
+        // Note: fill st using getattr before fuse_reply_attr
+        if (to_set & FUSE_SET_ATTR_SIZE) {
+            chfs->setattr(ino, attr->st_size);
+        }
+        getattr(ino, st);
+        fuse_reply_attr(req, &st, 0);
     // Change the above line to "#if 1", and your code goes here
     // Note: fill st using getattr before fuse_reply_attr
 #else
@@ -154,8 +166,16 @@ void
 fuseserver_read(fuse_req_t req, fuse_ino_t ino, size_t size,
         off_t off, struct fuse_file_info *fi)
 {
-#if 0
-    // Change the above "#if 0" to "#if 1", and your code goes here
+#if 1
+  std::string buf;
+  
+    int r;
+    if ((r = chfs->read(ino, size, off, buf)) == chfs_client::OK) {
+        fuse_reply_buf(req, buf.data(), buf.size());    
+    } else {
+        fuse_reply_err(req, ENOENT);
+    }
+
 #else
     fuse_reply_err(req, ENOSYS);
 #endif
@@ -183,7 +203,14 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
         const char *buf, size_t size, off_t off,
         struct fuse_file_info *fi)
 {
-#if 0
+#if 1
+  int r;
+    if ((r = chfs->write(ino, size, off, buf, size)) == chfs_client::OK) {
+        fuse_reply_write(req, size);
+    } else {
+        fuse_reply_err(req, ENOENT);
+    }
+
     // Change the above line to "#if 1", and your code goes here
 #else
     fuse_reply_err(req, ENOSYS);
@@ -384,7 +411,17 @@ fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
     // Suppress compiler warning of unused e.
     (void) e;
 
-#if 0
+#if 1
+    int r;
+    if (( r = fuseserver_createhelper( parent, name, mode, &e, extent_protocol::T_DIR)) == chfs_client::OK) {
+        fuse_reply_entry(req, &e);    
+    } else {
+        if (r == chfs_client::EXIST) {
+            fuse_reply_err(req, EEXIST);
+        } else {
+            fuse_reply_err(req, ENOENT);
+        }
+    }
     // Change the above line to "#if 1", and your code goes here
 #else
     fuse_reply_err(req, ENOSYS);
@@ -413,6 +450,50 @@ fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
         }
     }
 }
+
+void
+fuseserver_readlink(fuse_req_t req, fuse_ino_t ino) {
+    std::string buf;
+    
+    if (chfs->readlink(ino, buf) != chfs_client::OK) {
+        fuse_reply_err(req, ENOENT);
+        return;
+    }
+    fuse_reply_readlink(req, buf.c_str());
+}
+
+void
+fuseserver_symlink(fuse_req_t req, const char *link,
+                   fuse_ino_t parent, const char *name) {
+    chfs_client::inum id;
+    chfs_client::status stat;
+    struct fuse_entry_param e;
+
+    stat = chfs->symlink(parent, name, link, id);
+    if (stat != chfs_client::OK) {
+        if (stat == chfs_client::EXIST) {
+            fuse_reply_err(req, EEXIST);
+        } else {
+            fuse_reply_err(req, ENOENT);
+        }
+        return;
+    }
+
+    e.ino = id;
+    e.attr_timeout = 0.0;
+    e.entry_timeout = 0.0;
+    e.generation = 0;
+
+    if (getattr(id, e.attr) != chfs_client::OK) {
+        fuse_reply_err(req, ENOENT);
+        return;
+    }
+
+    fuse_reply_entry(req, &e);
+}
+
+
+
 
 void
 fuseserver_statfs(fuse_req_t req)
@@ -471,6 +552,8 @@ main(int argc, char *argv[])
     fuseserver_oper.setattr    = fuseserver_setattr;
     fuseserver_oper.unlink     = fuseserver_unlink;
     fuseserver_oper.mkdir      = fuseserver_mkdir;
+    fuseserver_oper.readlink   = fuseserver_readlink;
+    fuseserver_oper.symlink    = fuseserver_symlink;
     /** Your code here for Lab.
      * you may want to add
      * routines here to implement symbolic link,

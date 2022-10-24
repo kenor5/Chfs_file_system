@@ -19,6 +19,7 @@ test_if_has_mount
 ##################################################
 
 # run test 1
+
 ./test-lab1-part2-a.pl chfs1 | grep -q "Passed all"
 if [ $? -ne 0 ];
 then

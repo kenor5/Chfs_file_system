@@ -43,7 +43,7 @@ block_manager::alloc_block()
       return i;
     }
   }
-  assert(false);
+  // assert(false);
 
   return 0;
 }
@@ -78,12 +78,14 @@ block_manager::block_manager()
 void
 block_manager::read_block(uint32_t id, char *buf)
 {
+  assert(using_blocks[id]);
   d->read_block(id, buf);
 }
 
 void
 block_manager::write_block(uint32_t id, const char *buf)
 {
+  assert(using_blocks[id]!=0);
   d->write_block(id, buf);
 }
 
@@ -109,17 +111,17 @@ inode_manager::alloc_inode(uint32_t type)
    * note: the normal inode block should begin from the 2nd inode block.
    * the 1st is used for root_dir, see inode_manager::inode_manager().
    */
-  for (uint i = 1; i < INODE_NUM; ++i) {
+  inode_t *node = new inode();
+  node->type = type;
+  node->atime = node->mtime = node->ctime = time(NULL);
+  for (int i = 1; i < INODE_NUM; ++i) {
     struct inode* tmp = get_inode(i);
     
     if (tmp == nullptr) {
-      tmp = (inode_t *)malloc(sizeof(inode_t));
-      tmp->type = type;
-      tmp->atime = tmp->ctime = tmp->mtime = time(NULL);
-  
-      put_inode(i, tmp);
+      
+      put_inode(i, node);
 
-      free(tmp);
+      delete node;
 
       return i;
     }
@@ -245,9 +247,8 @@ void inode_manager::alloc_inode_block(struct inode* cur, blockid_t start, blocki
 
 void inode_manager::free_inode_block(struct inode* cur, blockid_t start, blockid_t num) {
   assert(start + num <= MAXFILE);
-  char buf[BLOCK_SIZE];
 
-  for (int i = start; i < start + num; ++i) {
+  for (blockid_t i = start; i < start + num; ++i) {
     bm->free_block(get_nth_block(cur, i));
   }
   // if (start <= NDIRECT && start+num >= NDIRECT)
@@ -301,7 +302,7 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
   }
   
 
-  cur->atime = cur->mtime = time(NULL);
+  cur->ctime = cur->mtime = time(NULL);
   cur->size = size;
   put_inode(inum, cur);
   free(cur);
@@ -349,11 +350,11 @@ inode_manager::remove_file(uint32_t inum)
   for (uint i = 0; i < block_num; ++i) {
     bm->free_block(get_nth_block(cur, i));
   }
-  // if (block_num >= NDIRECT)
-  //   bm->free_block(NDIRECT);
+  if (block_num > NDIRECT)
+    bm->free_block(cur->blocks[NDIRECT]);
     
+
   free(cur);
   free_inode(inum);
-  
   return;
 }

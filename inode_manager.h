@@ -82,6 +82,9 @@ class inode_manager {
   block_manager *bm;
   struct inode* get_inode(uint32_t inum);
   void put_inode(uint32_t inum, struct inode *ino);
+  void alloc_inode_block(struct inode* cur, blockid_t start, blockid_t num);
+  void free_inode_block(struct inode*, blockid_t start, blockid_t num);
+  blockid_t get_nth_block(struct inode* , blockid_t);
 
  public:
   inode_manager();
@@ -91,10 +94,7 @@ class inode_manager {
   void write_file(uint32_t inum, const char *buf, int size);
   void remove_file(uint32_t inum);
   void get_attr(uint32_t inum, extent_protocol::attr &a);
-
-  void alloc_inode_block(struct inode* cur, blockid_t start, blockid_t num);
-  void free_inode_block(struct inode*, blockid_t start, blockid_t num);
-  blockid_t get_nth_block(struct inode* , blockid_t);
+  
 };
 
 #endif
