@@ -2,12 +2,18 @@
 
 ChFSDIR1=$PWD/chfs1
 
+# unmount
 export PATH=$PATH:/usr/local/bin
-UMOUNT="umount -l"
-# if [ -f "/usr/local/bin/fusermount" -o -f "/usr/bin/fusermount" -o -f "/bin/fusermount" ]; then
-#     UMOUNT="fusermount -u";
-# fi
+
+UMOUNT="umount"
+if [ -f "/usr/local/bin/fusermount" -o -f "/usr/bin/fusermount" -o -f "/bin/fusermount" ]; then
+    UMOUNT="fusermount -uz";
+fi
+
 $UMOUNT $ChFSDIR1
-killall extent_server
+
+# stop servers
+# killall extent_server
+killall extent_server_dist
 killall chfs_client
-killall lock_server
+

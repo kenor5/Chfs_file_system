@@ -14,13 +14,16 @@ class extent_protocol {
     put = 0x6001,
     get,
     getattr,
-    remove
+    remove,
+    create
   };
 
+  //add the new file type symlink.
   enum types {
     T_DIR = 1,
     T_FILE,
     T_SYMLINK
+
   };
 
   struct attr {
