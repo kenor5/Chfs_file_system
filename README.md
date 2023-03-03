@@ -1,7 +1,7 @@
 # Lab 1: Basic File System
 
 lab1要求实现一个基础的文件系统，第一部分要求实现inode manager，第二部分要求实现一些基本的operation如get put create setattr等，架构图：
-![架构图]{https://ipads.se.sjtu.edu.cn/courses/cse/labs/lab1-assets/part1.png}
+![架构图](https://ipads.se.sjtu.edu.cn/courses/cse/labs/lab1-assets/part1.png)
 
 
 # Lab 2A: Atomicity
@@ -17,7 +17,7 @@ Lab2B要求实现在并发场景下的一致性
 第二部分实现一个locker server
 第三部分使用2PL保证并发操作正确
 
-![架构图]{https://ipads.se.sjtu.edu.cn/courses/cse/labs/lab2b-assets/lab2b-2.png}
+![架构图](https://ipads.se.sjtu.edu.cn/courses/cse/labs/lab2b-assets/lab2b-2.png)
 
 # Lab 3: Fault-tolerant Distributed Filesystem with Raft
 
