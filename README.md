@@ -27,4 +27,4 @@ Lab3要求使用Raft协议实现容错的分布式文件系统
 第二部分实现log备份机制
 第三部分实现持久化日志
 第五部分用raft协议拓展lab1中的单体文件系统
-![架构]{https://ipads.se.sjtu.edu.cn/courses/cse/labs/lab3-assets/part5.png}
+![架构](https://ipads.se.sjtu.edu.cn/courses/cse/labs/lab3-assets/part5.png)
